@@ -1,6 +1,7 @@
 import numpy as np
 from sortedcollections import OrderedSet
 import math
+import matplotlib.pyplot as plt
 
 obstacle_points = []
 
@@ -126,10 +127,48 @@ def get_input():
         else:
             print("Entered goal node is either an obstacle or out of map. Please enter another co-ordinate...")    
 
-    rpm1 = int(input("Enter RPM1: "))
-    rpm2 = int(input("Enter RPM2: "))
+    rpm1 = int(input("Enter rpm1: "))
+    rpm2 = int(input("Enter rpm2: "))
 
     clearance = int(input("Enter clearance: "))
     return start_node, goal_node, obstacle_points, hexagon_pts, triangle_pts, rpm1, rpm2, clearance
 
-start_node, goal_node, obstacle_points, hexagon_pts, triangle_pts, rpm1, rpm2, clearance = get_input()
+def cost(x_initial,y_initial,theta,ul,ur):
+    t = 0
+    r = 0.038
+    L = 0.354
+    dt = 0.1
+    thetan = 3.14 * theta / 180
+    d = 0
+    next_x = x_initial
+    next_y = y_initial
+    intermediate_points = []
+    while t<1:
+        t = t + dt
+        change_in_x = 0.5*r * (ul + ur) * math.cos(thetan) * dt
+        change_in_y = 0.5*r * (ul + ur) * math.sin(thetan) * dt
+        # thetan += (r / L) * (ur - ul) * dt
+        next_x = next_x + change_in_x
+        next_y = next_y + change_in_y
+        intermediate_points.append((next_x, next_y))
+        d = d + math.sqrt(math.pow(change_in_x,2)+math.pow(change_in_y ,2))
+    return d, intermediate_points
+
+# start_node, goal_node, obstacle_points, hexagon_pts, triangle_pts, rpm1, rpm2, clearance = get_input()
+rpm1 = 15
+rpm2 = 25
+action_set = [[0, rpm1], [rpm1, 0], [rpm1, rpm1], [0, rpm2], [rpm2, 0], [rpm2, rpm2], [rpm1, rpm2], [rpm2, rpm1]]
+
+for action in action_set:
+    d, intermediate_points = cost(0, 0, 60, action[0], action[1])
+    x = []
+    y = []
+    for pt in intermediate_points:
+        # print(pt)
+        x.append(pt[0])
+        y.append(pt[1])
+    # print(intermediate_points)
+    plt.plot(x, y)
+    # print("-----")
+        # plt.scatter(pt[0], pt[1])
+plt.show()
