@@ -2,12 +2,18 @@ import numpy as np
 from sortedcollections import OrderedSet
 import math
 import matplotlib.pyplot as plt
+from queue import PriorityQueue
+import time
 
 obstacle_points = []
 
 # size of the map
 X_SIZE = 600
 Y_SIZE = 250
+
+def euclidean_distance(pt1, pt2):
+    distance = math.sqrt(pow((pt1[0] - pt2[0]), 2) + pow((pt1[1] - pt2[1]),2))
+    return round(distance, 2)
 
 def find_intersection_pt(a1, a2, intercept1, intercept2, b1, b2):
     A = np.array([[a1, b1], [a2, b2]])
@@ -127,13 +133,13 @@ def get_input():
         else:
             print("Entered goal node is either an obstacle or out of map. Please enter another co-ordinate...")    
 
-    rpm1 = int(input("Enter rpm1: "))
-    rpm2 = int(input("Enter rpm2: "))
+    rpm1 = int(input("Enter rpm1 : "))
+    rpm2 = int(input("Enter rpm2 : "))
 
     clearance = int(input("Enter clearance: "))
     return start_node, goal_node, obstacle_points, hexagon_pts, triangle_pts, rpm1, rpm2, clearance
 
-def cost(x_initial,y_initial,theta,ul,ur):
+def move(x_initial,y_initial,theta,ul,ur):
     t = 0
     r = 0.038
     L = 0.354
@@ -145,21 +151,89 @@ def cost(x_initial,y_initial,theta,ul,ur):
     intermediate_points = []
     while t<1:
         t = t + dt
-        change_in_x = 0.5*r * (ul + ur) * math.cos(thetan) * dt
-        change_in_y = 0.5*r * (ul + ur) * math.sin(thetan) * dt
-        # thetan += (r / L) * (ur - ul) * dt
-        next_x = next_x + change_in_x
-        next_y = next_y + change_in_y
-        intermediate_points.append((next_x, next_y))
-        d = d + math.sqrt(math.pow(change_in_x,2)+math.pow(change_in_y ,2))
-    return d, intermediate_points
+        dx = 0.5*r * (ul + ur) * math.cos(thetan) * dt
+        dy = 0.5*r * (ul + ur) * math.sin(thetan) * dt
+        thetan += (r / L) * (ur - ul) * dt
+        next_x = next_x + dx
+        next_y = next_y + dy
+        if (next_x, next_y) not in obstacle_points:
+            intermediate_points.append((next_x, next_y))
+            d = d + math.sqrt(math.pow(dx,2)+math.pow(dy ,2))
+        else:
+            break
+    
+    #next_point = (next_x, next_y)
+    next_point = (next_x, next_y, thetan)
+    print("The next point is :", next_point)
+    cost_to_come = d
+    cost_to_go = euclidean_distance((next_x,next_y),(x_initial,y_initial))
+    total_cost = cost_to_come+cost_to_go
+    next_node = (total_cost, cost_to_go, cost_to_come, next_point)
 
-# start_node, goal_node, obstacle_points, hexagon_pts, triangle_pts, rpm1, rpm2, clearance = get_input()
+    for i in range(map_queue.qsize()):
+        if map_queue.queue[i][3] == next_point:
+        #if euclidean_distance(next_point,map_queue.queue[i][2]) <= 0.5 and (next_angle - map_queue.queue[i][2][2]) <= 30:
+            if map_queue.queue[i][0] > total_cost:
+                map_queue.queue[i] = next_node 
+                parent_child_info[next_point] = (x_initial,y_initial)
+                visited_pts.append(next_point)
+                return 
+            else:
+                return
+    map_queue.put(next_node)
+    parent_child_info[next_point] = (x_initial,y_initial)
+    visited_pts.append(next_point)
+
+    #return d, intermediate_points
+
+start_node, goal_node, obstacle_points, hexagon_pts, triangle_pts, rpm1, rpm2, clearance = get_input()
 rpm1 = 15
 rpm2 = 25
 action_set = [[0, rpm1], [rpm1, 0], [rpm1, rpm1], [0, rpm2], [rpm2, 0], [rpm2, rpm2], [rpm1, rpm2], [rpm2, rpm1]]
 
-for action in action_set:
+start = time.time()
+map_queue = PriorityQueue()
+start_pt = (start_node[0], start_node[1])
+goal_pt = (goal_node[0], goal_node[1])
+map_queue.put((euclidean_distance(start_pt, goal_pt), euclidean_distance(start_pt, goal_pt), 0, start_node))
+
+visited_nodes = np.zeros((1200,500,12), dtype=int)
+parent_child_info = {}
+shortest_path = []
+visited_pts= []
+visualization_points = create_obstacle_map(clearance)
+goal_reached = False
+while map_queue.qsize() != 0:
+    current_node = map_queue.get()
+    x, y, theta = current_node[3][0], current_node[3][1], current_node[3][2]
+    print("The current node inside the while True is : ")
+    print(current_node)
+
+    if visited_nodes[int(x*2)][int(y*2)][int(theta/30)] != 1:
+        visited_nodes[int(x*2)][int(y*2)][int(theta/30)]=1 
+        if euclidean_distance((x,y), goal_pt) > 4.5:
+            #for action in action_set:
+            move(x,y,theta,100,100)
+
+
+        else:
+            print("Reached Goal")
+            stop = time.time()
+            print("Time: ",stop - start)   
+                #shortest = back_tracking(parent_child_info, start_pt, goal_pt)
+            """ shortest = back_tracking(parent_child_info, start_node, current_node[3])
+                #shortest.reverse()  
+                print(shortest) """
+            break
+
+# xs = (np.where(visited_nodes == 1)[0])/2
+# ys = (np.where(visited_nodes == 1)[1])/2
+# visited_pts = []
+# for x, y in zip(xs, ys):
+#     visited_pts.append((int(x), int(y)))
+# print(visited_pts)    
+
+""" for action in action_set:
     d, intermediate_points = cost(0, 0, 60, action[0], action[1])
     x = []
     y = []
@@ -171,4 +245,4 @@ for action in action_set:
     plt.plot(x, y)
     # print("-----")
         # plt.scatter(pt[0], pt[1])
-plt.show()
+plt.show() """
