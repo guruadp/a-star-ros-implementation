@@ -11,6 +11,16 @@ obstacle_points = []
 X_SIZE = 600
 Y_SIZE = 250
 
+def round_nearest(val):
+    if val-int(val)<0.25:
+        val=int(val)
+    elif val-int(val) >= 0.25 and val-int(val) < 0.75:
+        val=int(val)+0.5
+    else:
+        val = int(val)+1
+    
+    return val
+
 def euclidean_distance(pt1, pt2):
     distance = math.sqrt(pow((pt1[0] - pt2[0]), 2) + pow((pt1[1] - pt2[1]),2))
     return round(distance, 2)
@@ -140,6 +150,7 @@ def get_input():
     return start_node, goal_node, obstacle_points, hexagon_pts, triangle_pts, rpm1, rpm2, clearance
 
 def move(x_initial,y_initial,theta,ul,ur):
+    global goal_reached
     t = 0
     r = 0.038
     L = 0.354
@@ -162,29 +173,49 @@ def move(x_initial,y_initial,theta,ul,ur):
         else:
             break
     
+    
+    thetan = int(thetan*180/3.14)
     #next_point = (next_x, next_y)
+    next_x = round_nearest(next_x)
+    next_y = round_nearest(next_y)
     next_point = (next_x, next_y, thetan)
-    print("The next point is :", next_point)
-    cost_to_come = d
-    cost_to_go = euclidean_distance((next_x,next_y),(x_initial,y_initial))
-    total_cost = cost_to_come+cost_to_go
-    next_node = (total_cost, cost_to_go, cost_to_come, next_point)
+    if visited_nodes[int(next_point[0]*2)][int(next_point[1]*2)]!= 1 and (next_x, next_y) not in obstacle_points:
+        #print("The next point is :", next_point)
+        cost_to_come = d
+        cost_to_go = euclidean_distance((next_x,next_y),goal_pt)
+        total_cost = cost_to_come+cost_to_go
+        next_node = (total_cost, cost_to_go, cost_to_come, next_point)
 
-    for i in range(map_queue.qsize()):
-        if map_queue.queue[i][3] == next_point:
-        #if euclidean_distance(next_point,map_queue.queue[i][2]) <= 0.5 and (next_angle - map_queue.queue[i][2][2]) <= 30:
-            if map_queue.queue[i][0] > total_cost:
-                map_queue.queue[i] = next_node 
-                parent_child_info[next_point] = (x_initial,y_initial)
-                visited_pts.append(next_point)
-                return 
-            else:
-                return
-    map_queue.put(next_node)
-    parent_child_info[next_point] = (x_initial,y_initial)
-    visited_pts.append(next_point)
+        for i in range(map_queue.qsize()):
+            if map_queue.queue[i][3][0] == next_point[0] and map_queue.queue[i][3][1] == next_point[1]:
+            #if euclidean_distance(next_point,map_queue.queue[i][2]) <= 0.5 and (next_angle - map_queue.queue[i][2][2]) <= 30:
+                if map_queue.queue[i][0] > total_cost:
+                    map_queue.queue[i] = next_node 
+                    parent_child_info[next_point] = (x_initial,y_initial,theta)
+                    visited_pts.append(next_point)
+                    return 
+                else:
+                    return
+        map_queue.put(next_node)
+        parent_child_info[next_point] = (x_initial,y_initial,theta)
+        visited_pts.append(next_point)
+        if cost_to_go < 1.5:
+            goal_reached = True
+        else:
+            goal_reached = False
 
     #return d, intermediate_points
+
+def back_tracking(path, initial_state, curr_val):
+    optimal_path = []
+    optimal_path.append(curr_val)
+    parent_path = (curr_val)
+    while parent_path != initial_state:  
+        parent_path = path[parent_path]
+        optimal_path.append(parent_path)
+    
+    optimal_path.reverse()
+    return optimal_path
 
 start_node, goal_node, obstacle_points, hexagon_pts, triangle_pts, rpm1, rpm2, clearance = get_input()
 rpm1 = 15
@@ -197,7 +228,7 @@ start_pt = (start_node[0], start_node[1])
 goal_pt = (goal_node[0], goal_node[1])
 map_queue.put((euclidean_distance(start_pt, goal_pt), euclidean_distance(start_pt, goal_pt), 0, start_node))
 
-visited_nodes = np.zeros((1200,500,12), dtype=int)
+visited_nodes = np.zeros((1200,500), dtype=int)
 parent_child_info = {}
 shortest_path = []
 visited_pts= []
@@ -209,21 +240,24 @@ while map_queue.qsize() != 0:
     print("The current node inside the while True is : ")
     print(current_node)
 
-    if visited_nodes[int(x*2)][int(y*2)][int(theta/30)] != 1:
-        visited_nodes[int(x*2)][int(y*2)][int(theta/30)]=1 
-        if euclidean_distance((x,y), goal_pt) > 4.5:
-            #for action in action_set:
-            move(x,y,theta,100,100)
+    if visited_nodes[int(x*2)][int(y*2)] != 1:
+        visited_nodes[int(x*2)][int(y*2)]=1 
+        if euclidean_distance((x,y), goal_pt) > 1.5:
+            for action in action_set:
+                if goal_reached == False:
+                    move(x,y,theta,action[0],action[1])
 
 
         else:
             print("Reached Goal")
+            print("The Targeted goal is : ", goal_pt)
+            print("Reached goal is : ",(x,y))
             stop = time.time()
             print("Time: ",stop - start)   
                 #shortest = back_tracking(parent_child_info, start_pt, goal_pt)
-            """ shortest = back_tracking(parent_child_info, start_node, current_node[3])
-                #shortest.reverse()  
-                print(shortest) """
+            shortest = back_tracking(parent_child_info, start_node, current_node[3])
+            print("The shortest path is :")
+            print(shortest)
             break
 
 # xs = (np.where(visited_nodes == 1)[0])/2
