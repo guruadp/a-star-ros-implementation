@@ -6,7 +6,7 @@ from queue import PriorityQueue
 import time
 
 obstacle_points = []
-
+plot_shortest = {}
 # size of the map
 X_SIZE = 600
 Y_SIZE = 250
@@ -160,6 +160,7 @@ def move(x_initial,y_initial,theta,ul,ur):
     next_x = x_initial
     next_y = y_initial
     intermediate_points = []
+    intermediate_points.append((x_initial,y_initial))
     while t<1:
         t = t + dt
         dx = 0.5*r * (ul + ur) * math.cos(thetan) * dt
@@ -178,6 +179,7 @@ def move(x_initial,y_initial,theta,ul,ur):
     #next_point = (next_x, next_y)
     next_x = round_nearest(next_x)
     next_y = round_nearest(next_y)
+    intermediate_points.append((next_x, next_y))
     next_point = (next_x, next_y, thetan)
     if visited_nodes[int(next_point[0]*2)][int(next_point[1]*2)]!= 1 and (next_x, next_y) not in obstacle_points:
         #print("The next point is :", next_point)
@@ -192,12 +194,13 @@ def move(x_initial,y_initial,theta,ul,ur):
                 if map_queue.queue[i][0] > total_cost:
                     map_queue.queue[i] = next_node 
                     parent_child_info[next_point] = (x_initial,y_initial,theta)
-                    visited_pts.append(next_point)
+                    plot_shortest[(next_point,(x_initial,y_initial,theta))] = intermediate_points
                     return 
                 else:
                     return
         map_queue.put(next_node)
         parent_child_info[next_point] = (x_initial,y_initial,theta)
+        plot_shortest[(next_point,(x_initial,y_initial,theta))] = intermediate_points
         visited_pts.append(next_point)
         if cost_to_go < 1.5:
             goal_reached = True
@@ -206,16 +209,24 @@ def move(x_initial,y_initial,theta,ul,ur):
 
     #return d, intermediate_points
 
-def back_tracking(path, initial_state, curr_val):
+def back_tracking(path, initial_state, curr_val, plot_shortest):
+    coords = []
     optimal_path = []
     optimal_path.append(curr_val)
     parent_path = (curr_val)
+   # child = path[parent_path]
     while parent_path != initial_state:  
+        coords.append((plot_shortest[(parent_path,path[parent_path])]))
         parent_path = path[parent_path]
         optimal_path.append(parent_path)
+    """ while child != initial_state:  
+        child = path[parent_path]
+        optimal_path.append(child)
+        coords.append((plot_shortest[(child,path[curr_val])])) """
     
     optimal_path.reverse()
-    return optimal_path
+    coords.reverse()
+    return optimal_path,coords
 
 start_node, goal_node, obstacle_points, hexagon_pts, triangle_pts, rpm1, rpm2, clearance = get_input()
 rpm1 = 15
@@ -249,15 +260,28 @@ while map_queue.qsize() != 0:
 
 
         else:
+            X = []
+            Y = []
             print("Reached Goal")
             print("The Targeted goal is : ", goal_pt)
             print("Reached goal is : ",(x,y))
             stop = time.time()
             print("Time: ",stop - start)   
                 #shortest = back_tracking(parent_child_info, start_pt, goal_pt)
-            shortest = back_tracking(parent_child_info, start_node, current_node[3])
+            shortest, plot_data = back_tracking(parent_child_info, start_node, current_node[3], plot_shortest)
             print("The shortest path is :")
             print(shortest)
+            for i in range(0,len(plot_data)):
+                for j in range(0,11):
+                    x,y = plot_data[i][j]
+                    X.append(x)
+                    Y.append(y)
+                    
+            # print("-----")
+                # plt.scatter(pt[0], pt[1])
+            #plt.plot(X, Y)
+            plt.scatter(X,Y)
+            plt.show()
             break
 
 # xs = (np.where(visited_nodes == 1)[0])/2
