@@ -11,6 +11,19 @@ plot_shortest = {}
 X_SIZE = 600
 Y_SIZE = 250
 
+# Radius of the Turtlebot3 wheel
+r = 3.8
+# Length of the Turtlebot3 (Distance between wheels: Wheel base)
+L = 16
+
+# goal threshold distance from robot location
+goal_threshold = 7
+
+# Converting rpm to velocity (cm/s)
+def convert_vel(wheel_rpm):
+    velocity = wheel_rpm*2*math.pi*r/60
+    return velocity
+
 def round_nearest(val):
     if val-int(val)<0.25:
         val=int(val)
@@ -152,8 +165,9 @@ def get_input():
 def move(x_initial,y_initial,theta,ul,ur):
     global goal_reached
     t = 0
-    r = 0.038
-    L = 0.354
+    #r = 0.038
+    r=3.8
+    L = 16
     dt = 0.1
     thetan = 3.14 * theta / 180
     d = 0
@@ -166,9 +180,10 @@ def move(x_initial,y_initial,theta,ul,ur):
         dx = 0.5*r * (ul + ur) * math.cos(thetan) * dt
         dy = 0.5*r * (ul + ur) * math.sin(thetan) * dt
         thetan += (r / L) * (ur - ul) * dt
+        #thetan += (r / L) * (ur - ul) * dt
         next_x = next_x + dx
         next_y = next_y + dy
-        if (next_x, next_y) not in obstacle_points:
+        if (round_nearest(next_x), round_nearest(next_y)) not in obstacle_points:
             intermediate_points.append((next_x, next_y))
             d = d + math.sqrt(math.pow(dx,2)+math.pow(dy ,2))
         else:
@@ -176,12 +191,10 @@ def move(x_initial,y_initial,theta,ul,ur):
     
     
     thetan = int(thetan*180/3.14)
-    #next_point = (next_x, next_y)
-    next_x = round_nearest(next_x)
-    next_y = round_nearest(next_y)
-    intermediate_points.append((next_x, next_y))
     next_point = (next_x, next_y, thetan)
-    if visited_nodes[int(next_point[0]*2)][int(next_point[1]*2)]!= 1 and (next_x, next_y) not in obstacle_points:
+    if visited_nodes[int(next_point[0]*2)][int(next_point[1]*2)]!= 1 and (round_nearest(next_x), round_nearest(next_y)) not in obstacle_points:
+        # Intermediate points are the co-ordinates (path of the robot) from prev_x,prev_y to x_next,y_next 
+        intermediate_points.append((next_x, next_y))
         #print("The next point is :", next_point)
         cost_to_come = d
         cost_to_go = euclidean_distance((next_x,next_y),goal_pt)
@@ -200,9 +213,12 @@ def move(x_initial,y_initial,theta,ul,ur):
                     return
         map_queue.put(next_node)
         parent_child_info[next_point] = (x_initial,y_initial,theta)
+        # plot_shortest is a dictionary with:
+        # Key : (child,parent)
+        # Value : List of intermediate points used to plot the trajectory of robot from x_initial,y_initial to x_next,y_next 
         plot_shortest[(next_point,(x_initial,y_initial,theta))] = intermediate_points
         visited_pts.append(next_point)
-        if cost_to_go < 1.5:
+        if cost_to_go < goal_threshold:
             goal_reached = True
         else:
             goal_reached = False
@@ -253,10 +269,10 @@ while map_queue.qsize() != 0:
 
     if visited_nodes[int(x*2)][int(y*2)] != 1:
         visited_nodes[int(x*2)][int(y*2)]=1 
-        if euclidean_distance((x,y), goal_pt) > 1.5:
+        if euclidean_distance((x,y), goal_pt) > goal_threshold:
             for action in action_set:
                 if goal_reached == False:
-                    move(x,y,theta,action[0],action[1])
+                    move(x,y,theta,convert_vel(action[0]),convert_vel(action[1]))
 
 
         else:
