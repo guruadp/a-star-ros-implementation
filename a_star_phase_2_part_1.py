@@ -7,22 +7,24 @@ import time
 
 obstacle_points = []
 plot_shortest = {}
+robot_velocity_tracking = {}
 # size of the map
 X_SIZE = 600
 Y_SIZE = 250
 
+
 # Radius of the Turtlebot3 wheel
-r = 3.8
+r = 0.038
 # Length of the Turtlebot3 (Distance between wheels: Wheel base)
-L = 16
+L = 0.16
 
 # goal threshold distance from robot location
-goal_threshold = 7
+goal_threshold = 2.5
 
 # Converting rpm to velocity (cm/s)
 def convert_vel(wheel_rpm):
-    velocity = wheel_rpm*2*math.pi*r/60
-    return velocity
+    ang_velocity = wheel_rpm*2*math.pi/60
+    return ang_velocity
 
 def round_nearest(val):
     if val-int(val)<0.25:
@@ -46,6 +48,7 @@ def find_intersection_pt(a1, a2, intercept1, intercept2, b1, b2):
 
 # create map with obstacle
 def create_obstacle_map(clearance):
+    clearance = clearance
     points = OrderedSet()
     x_range = np.arange(0, X_SIZE+1, 0.5)
     y_range1 = np.arange(0, clearance+1, 0.5)
@@ -132,7 +135,8 @@ def create_obstacle_map(clearance):
 
 def get_input():
     # Create Obstacle based on the clearance and radius of the robot
-    obstacle_points, hexagon_pts, triangle_pts = create_obstacle_map(5)
+    clearance = float(input("Enter clearance: "))
+    obstacle_points, hexagon_pts, triangle_pts = create_obstacle_map(clearance)
 
     accept_start_node, accept_goal_node = True, True
     while accept_start_node:
@@ -159,17 +163,24 @@ def get_input():
     rpm1 = int(input("Enter rpm1 : "))
     rpm2 = int(input("Enter rpm2 : "))
 
-    clearance = int(input("Enter clearance: "))
     return start_node, goal_node, obstacle_points, hexagon_pts, triangle_pts, rpm1, rpm2, clearance
+def update_theta(angle):
+    if angle < 0:
+        angle +=360
+    elif angle > 360:
+        angle = angle%360
+        
 
 def move(x_initial,y_initial,theta,ul,ur):
+    print("Move function")
     global goal_reached
     t = 0
     #r = 0.038
-    r=3.8
-    L = 16
+    r = 0.038
+    L = 0.16
     dt = 0.1
-    thetan = 3.14 * theta / 180
+    theta_initial = 3.14 * theta / 180
+    thetan = theta_initial
     d = 0
     next_x = x_initial
     next_y = y_initial
@@ -180,19 +191,25 @@ def move(x_initial,y_initial,theta,ul,ur):
         dx = 0.5*r * (ul + ur) * math.cos(thetan) * dt
         dy = 0.5*r * (ul + ur) * math.sin(thetan) * dt
         thetan += (r / L) * (ur - ul) * dt
-        #thetan += (r / L) * (ur - ul) * dt
         next_x = next_x + dx
         next_y = next_y + dy
-        if (round_nearest(next_x), round_nearest(next_y)) not in obstacle_points:
+        #if (round_nearest(next_x), round_nearest(next_y)) not in obstacle_points:
+        if (np.round(next_x,1), np.round(next_y,1)) not in obstacle_points:
             intermediate_points.append((next_x, next_y))
             d = d + math.sqrt(math.pow(dx,2)+math.pow(dy ,2))
         else:
             break
     
-    
-    thetan = int(thetan*180/3.14)
-    next_point = (next_x, next_y, thetan)
-    if visited_nodes[int(next_point[0]*2)][int(next_point[1]*2)]!= 1 and (round_nearest(next_x), round_nearest(next_y)) not in obstacle_points:
+    print(next_x,next_y)
+    if visited_nodes[int(next_x*2)][int(next_y*2)]!= 1 and (np.round(next_x,1), np.round(next_y,1)) not in obstacle_points:
+        print("entered if condition inside the move function")
+        x_v = (next_x-x_initial)/t
+        y_v = (next_y-y_initial)/t
+        theta_v = (thetan - theta_initial)/t
+        thetan = update_theta(thetan)
+        thetan = int(thetan*180/3.14)
+        next_point = (next_x, next_y, thetan)
+        robot_velocity_tracking[(next_point,(x_initial,y_initial,theta))] = (x_v,y_v,theta_v)
         # Intermediate points are the co-ordinates (path of the robot) from prev_x,prev_y to x_next,y_next 
         intermediate_points.append((next_x, next_y))
         #print("The next point is :", next_point)
@@ -225,7 +242,8 @@ def move(x_initial,y_initial,theta,ul,ur):
 
     #return d, intermediate_points
 
-def back_tracking(path, initial_state, curr_val, plot_shortest):
+def back_tracking(path, initial_state, curr_val, plot_shortest,robot_velocity_tracking):
+    robot_velocity = []
     coords = []
     optimal_path = []
     optimal_path.append(curr_val)
@@ -233,6 +251,8 @@ def back_tracking(path, initial_state, curr_val, plot_shortest):
    # child = path[parent_path]
     while parent_path != initial_state:  
         coords.append((plot_shortest[(parent_path,path[parent_path])]))
+        ## robot_velocity is a list of tuples where each tuple is the x,y,z velocities, which needs to be published every second to the cmd_vel topic
+        robot_velocity.append((robot_velocity_tracking[(parent_path,path[parent_path])]))
         parent_path = path[parent_path]
         optimal_path.append(parent_path)
     """ while child != initial_state:  
@@ -242,11 +262,9 @@ def back_tracking(path, initial_state, curr_val, plot_shortest):
     
     optimal_path.reverse()
     coords.reverse()
-    return optimal_path,coords
+    return optimal_path,coords,robot_velocity
 
 start_node, goal_node, obstacle_points, hexagon_pts, triangle_pts, rpm1, rpm2, clearance = get_input()
-rpm1 = 15
-rpm2 = 25
 action_set = [[0, rpm1], [rpm1, 0], [rpm1, rpm1], [0, rpm2], [rpm2, 0], [rpm2, rpm2], [rpm1, rpm2], [rpm2, rpm1]]
 
 start = time.time()
@@ -268,6 +286,7 @@ while map_queue.qsize() != 0:
     print(current_node)
 
     if visited_nodes[int(x*2)][int(y*2)] != 1:
+        print("Visiting new node")
         visited_nodes[int(x*2)][int(y*2)]=1 
         if euclidean_distance((x,y), goal_pt) > goal_threshold:
             for action in action_set:
@@ -284,9 +303,11 @@ while map_queue.qsize() != 0:
             stop = time.time()
             print("Time: ",stop - start)   
                 #shortest = back_tracking(parent_child_info, start_pt, goal_pt)
-            shortest, plot_data = back_tracking(parent_child_info, start_node, current_node[3], plot_shortest)
+            shortest, plot_data, robot_velocity_list = back_tracking(parent_child_info, start_node, current_node[3], plot_shortest, robot_velocity_tracking)
             print("The shortest path is :")
             print(shortest)
+            print("Robot velocity list")
+            print(robot_velocity_list)
             for i in range(0,len(plot_data)):
                 for j in range(0,11):
                     x,y = plot_data[i][j]
@@ -299,24 +320,3 @@ while map_queue.qsize() != 0:
             plt.scatter(X,Y)
             plt.show()
             break
-
-# xs = (np.where(visited_nodes == 1)[0])/2
-# ys = (np.where(visited_nodes == 1)[1])/2
-# visited_pts = []
-# for x, y in zip(xs, ys):
-#     visited_pts.append((int(x), int(y)))
-# print(visited_pts)    
-
-""" for action in action_set:
-    d, intermediate_points = cost(0, 0, 60, action[0], action[1])
-    x = []
-    y = []
-    for pt in intermediate_points:
-        # print(pt)
-        x.append(pt[0])
-        y.append(pt[1])
-    # print(intermediate_points)
-    plt.plot(x, y)
-    # print("-----")
-        # plt.scatter(pt[0], pt[1])
-plt.show() """
