@@ -51,9 +51,10 @@ def flip_object_points(points, height, object_height):
     return (points[0], height - points[1] - object_height)
 
 # create map with obstacle
-def create_obstacle_map(clearance, points_rate):
+def create_obstacle_map(clearance):
     X_SIZE = 6
     Y_SIZE = 2
+    points_rate=0.1
     plt.xlim([0, X_SIZE])
     plt.ylim([0, Y_SIZE])
     points = OrderedSet()
@@ -77,7 +78,7 @@ def create_obstacle_map(clearance, points_rate):
             
             # Circle
             if pow((xp - 4.00), 2) + pow((yp - 1.10), 2) - pow((0.5 + 2 * clearance), 2) <= 0:
-                points.add((xp,yp))
+                points.add((round(xp,1), round(yp, 1)))  
                 plt.scatter(xp, yp)
 
     plt.show()
@@ -86,7 +87,7 @@ def create_obstacle_map(clearance, points_rate):
 def get_input():
     # Create Obstacle based on the clearance and radius of the robot
     clearance = float(input("Enter clearance: "))
-    obstacle_points = create_obstacle_map(clearance, points_rate=0.1)
+    obstacle_points = create_obstacle_map(clearance)
 
     accept_start_node, accept_goal_node = True, True
     while accept_start_node:
@@ -113,7 +114,7 @@ def get_input():
     rpm1 = int(input("Enter rpm1 : "))
     rpm2 = int(input("Enter rpm2 : "))
 
-    return start_node, goal_node, obstacle_points, hexagon_pts, triangle_pts, rpm1, rpm2, clearance
+    return start_node, goal_node, obstacle_points, rpm1, rpm2, clearance
 
 def update_theta(angle):
     if angle < 0:
@@ -255,7 +256,7 @@ def pygame_visualization(clearance):
     pyg.time.wait(3000)
     pyg.quit()
 
-start_node, goal_node, obstacle_points, hexagon_pts, triangle_pts, rpm1, rpm2, clearance = get_input()
+start_node, goal_node, obstacle_points, rpm1, rpm2, clearance = get_input()
 action_set = [[0, rpm1], [rpm1, 0], [rpm1, rpm1], [0, rpm2], [rpm2, 0], [rpm2, rpm2], [rpm1, rpm2], [rpm2, rpm1]]
 
 start = time.time()
@@ -312,4 +313,4 @@ while map_queue.qsize() != 0:
             plt.show()
             break
 
-pygame_visualization(clearance = 5)
+pygame_visualization(clearance=5)
