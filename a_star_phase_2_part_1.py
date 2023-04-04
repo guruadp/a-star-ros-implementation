@@ -4,6 +4,7 @@ import math
 import matplotlib.pyplot as plt
 from queue import PriorityQueue
 import time
+import pygame as pyg
 
 obstacle_points = []
 plot_shortest = {}
@@ -46,97 +47,46 @@ def find_intersection_pt(a1, a2, intercept1, intercept2, b1, b2):
     X = np.linalg.solve(A, B)
     return (X[0][0], X[1][0])
 
+def flip_object_points(points, height, object_height):
+    return (points[0], height - points[1] - object_height)
+
 # create map with obstacle
-def create_obstacle_map(clearance):
-    clearance = clearance
+def create_obstacle_map(clearance, points_rate):
+    X_SIZE = 6
+    Y_SIZE = 2
+    plt.xlim([0, X_SIZE])
+    plt.ylim([0, Y_SIZE])
     points = OrderedSet()
-    x_range = np.arange(0, X_SIZE+1, 0.5)
-    y_range1 = np.arange(0, clearance+1, 0.5)
-    y_range2 = np.arange(Y_SIZE - clearance, Y_SIZE + 1, 0.5)
-    for xp in x_range:
-        for yp in y_range1:
-            points.add((xp,yp))
-        for yp in y_range2:
-            points.add((xp,yp))
 
-    y_range = np.arange(0, Y_SIZE + 1, 0.5)
-    x_range1 = np.arange(0, clearance+1, 0.5)
-    x_range2 = np.arange(X_SIZE - clearance, X_SIZE + 1, 0.5)
-    for yp in y_range:
-        for xp in x_range1:
-            points.add((xp,yp))
-        for xp in x_range2:
-            points.add((xp,yp))
+    for xp in np.arange(0, X_SIZE + points_rate, points_rate):
+        for yp in np.arange(0, Y_SIZE + points_rate, points_rate):
+            # Border
+            if xp <= clearance or xp >= X_SIZE-clearance or yp <= clearance or yp >= Y_SIZE-clearance:
+                points.add((round(xp,1), round(yp, 1)))   
+                plt.scatter(xp, yp)
 
-    # Rectangles and clearance
-    x_range = np.arange(100 - clearance, 150 + clearance + 1, 0.5)
-    y_range = np.arange(0, Y_SIZE+1, 0.5)
-    for xp in x_range:
-        for yp in y_range:
-            if yp <= (100 + clearance) or yp >= (150 - clearance):
+            # Rectangle 1
+            if yp >= 0.75 - clearance and xp >= 1.50 - clearance and xp <= 1.65 + clearance:
+                points.add((round(xp,1), round(yp, 1)))   
+                plt.scatter(xp, yp)
+
+            # Rectangle 2
+            if yp <= 1.25 + clearance and xp >= 2.50 - clearance and xp <= 2.65 + clearance:
+                points.add((round(xp,1), round(yp, 1)))  
+                plt.scatter(xp, yp)
+            
+            # Circle
+            if pow((xp - 4.00), 2) + pow((yp - 1.10), 2) - pow((0.5 + 2 * clearance), 2) <= 0:
                 points.add((xp,yp))
+                plt.scatter(xp, yp)
 
-    # triangle 
-    x_range = np.arange(460-clearance, 510+2*clearance, 0.5)
-    y_range = np.arange(0, Y_SIZE, 0.5)
-
-    m = 2
-    b1, b2 = -895, 1145
-    
-    c1 = b1 + clearance * (math.sqrt(pow(m,2) + 1))
-    c2 = b1 - clearance * (math.sqrt(pow(m,2) + 1))
-    c3 = b2 + clearance * (math.sqrt(pow(m,2) + 1))
-    c4 = b2 - clearance * (math.sqrt(pow(m,2) + 1))
-
-    for xp in x_range:
-        for yp in y_range:            
-            if (-m*xp+yp >= min(c1, c2)) and (m*xp+yp <= max(c3, c4)):
-                    points.add((xp,yp)) 
-
-    triangle_p1 = [460 - clearance, 225 + clearance]
-    triangle_p2 = find_intersection_pt(m, 0, max(c3, c4), 225 + clearance, 1, 1)
-    triangle_p3 = find_intersection_pt(-m, m, min(c1, c2), max(c3, c4), 1, 1)
-    triangle_p4 = find_intersection_pt(-m, 0, min(c1, c2), 25 - clearance, 1, 1)
-    triangle_p5 = [460 - clearance, 25 - clearance]
-
-    triangle_pts = [triangle_p1, triangle_p2, triangle_p3, triangle_p4, triangle_p5]
-
-    # Hexagon
-    x_range = np.arange(300 - int(64.95) - clearance, 300 + int(64.95) + clearance, 0.5)
-    y_range = np.arange(125 - 75 - clearance, 125 + 75 + clearance, 0.5)
-
-    m = 15/26
-    b1, b2, b3, b4 = 26.92, 373.07, 223.07, -123.21
-    
-    c1 = b1 + clearance * (math.sqrt(pow(m,2) + 1))
-    c2 = b1 - clearance * (math.sqrt(pow(m,2) + 1))
-    c3 = b2 + clearance * (math.sqrt(pow(m,2) + 1))
-    c4 = b2 - clearance * (math.sqrt(pow(m,2) + 1))
-    c5 = b3 + clearance * (math.sqrt(pow(m,2) + 1))
-    c6 = b3 - clearance * (math.sqrt(pow(m,2) + 1))
-    c7 = b4 + clearance * (math.sqrt(pow(m,2) + 1))
-    c8 = b4 - clearance * (math.sqrt(pow(m,2) + 1))
-
-    for xp in x_range:
-        for yp in y_range:            
-            if  (yp - m*xp - max(c1, c2)) <= 0 and (yp + m*xp - max(c3, c4)) <= 0 and (yp - m*xp - min(c7, c8)) >= 0 and (yp + m*xp + min(c5, c6)) >= 0:
-                points.add((xp,yp))    
-
-    hexagon_p1 = find_intersection_pt(-m, m, max(c1, c2), max(c3, c4), 1, 1)
-    hexagon_p2 = find_intersection_pt(m, 1, max(c3, c4), 300 + 64.95 + clearance, 1, 0)
-    hexagon_p3 = find_intersection_pt(1, -m, 300 + 64.95 + clearance, min(c7, c8), 0, 1)
-    hexagon_p4 = find_intersection_pt(m, -m, min(c5, c6), min(c7, c8), 1, 1)
-    hexagon_p5 = find_intersection_pt(m, 1, min(c5, c6), 300 - 64.95 -clearance, 1, 0)
-    hexagon_p6 = find_intersection_pt(1, -m, 300 - 64.95-clearance, max(c1, c2), 0, 1)
-
-    hexagon_pts = [hexagon_p1, hexagon_p2, hexagon_p3, hexagon_p4, hexagon_p5, hexagon_p6]
-
-    return points, hexagon_pts, triangle_pts
+    plt.show()
+    return points
 
 def get_input():
     # Create Obstacle based on the clearance and radius of the robot
     clearance = float(input("Enter clearance: "))
-    obstacle_points, hexagon_pts, triangle_pts = create_obstacle_map(clearance)
+    obstacle_points = create_obstacle_map(clearance, points_rate=0.1)
 
     accept_start_node, accept_goal_node = True, True
     while accept_start_node:
@@ -164,13 +114,13 @@ def get_input():
     rpm2 = int(input("Enter rpm2 : "))
 
     return start_node, goal_node, obstacle_points, hexagon_pts, triangle_pts, rpm1, rpm2, clearance
+
 def update_theta(angle):
     if angle < 0:
         angle +=360
     elif angle > 360:
         angle = angle%360
         
-
 def move(x_initial,y_initial,theta,ul,ur):
     print("Move function")
     global goal_reached
@@ -264,6 +214,47 @@ def back_tracking(path, initial_state, curr_val, plot_shortest,robot_velocity_tr
     coords.reverse()
     return optimal_path,coords,robot_velocity
 
+def pygame_visualization(clearance):
+    pyg.init()
+    window = pyg.display.set_mode((X_SIZE,Y_SIZE))
+
+    obstacle_color = "red"
+    clearance_color = "pink"
+    condition = True
+    clock = pyg.time.Clock()
+
+    rect1_clearance = flip_object_points([150 - clearance, 75 - clearance], Y_SIZE, 125+clearance)
+    rect2_clearance = flip_object_points([250 - clearance, 0], Y_SIZE, 125+clearance)
+
+    rect1_original = flip_object_points([150, 75], Y_SIZE, 125)
+    rect2_original = flip_object_points([250, 0], Y_SIZE, 125)
+
+    # circle_clearance = flip_points([400, 110], Y_SIZE)
+    # circle_original = flip_points([400, 110], Y_SIZE)
+
+    while condition:
+        for loop in pyg.event.get():
+            if loop.type == pyg.QUIT:
+                condition = False
+
+        pyg.draw.rect(window, clearance_color ,pyg.Rect(0, 0, X_SIZE, clearance))
+        pyg.draw.rect(window, clearance_color ,pyg.Rect(0, Y_SIZE - clearance, X_SIZE, clearance))
+        pyg.draw.rect(window, clearance_color ,pyg.Rect(0, 0, clearance, Y_SIZE))
+        pyg.draw.rect(window, clearance_color ,pyg.Rect(X_SIZE - clearance, 0, clearance, Y_SIZE))
+
+        pyg.draw.rect(window, clearance_color, [rect1_clearance[0], rect1_clearance[1], 15 + 2*clearance, 125 + clearance], 0)
+        pyg.draw.rect(window, clearance_color, [rect2_clearance[0], rect2_clearance[1], 15 + 2*clearance, 125 + clearance], 0)
+        pyg.draw.rect(window, obstacle_color, pyg.Rect(rect2_original[0], rect2_original[1], 15, 125))
+        pyg.draw.rect(window, obstacle_color, pyg.Rect(rect1_original[0], rect1_original[1], 15, 125))
+
+        pyg.draw.circle(window, clearance_color, (400, 110), 50 + clearance)
+        pyg.draw.circle(window, obstacle_color, (400, 110), 50)
+
+        condition = False
+    pyg.display.flip()
+    pyg.time.wait(3000)
+    pyg.quit()
+
 start_node, goal_node, obstacle_points, hexagon_pts, triangle_pts, rpm1, rpm2, clearance = get_input()
 action_set = [[0, rpm1], [rpm1, 0], [rpm1, rpm1], [0, rpm2], [rpm2, 0], [rpm2, rpm2], [rpm1, rpm2], [rpm2, rpm1]]
 
@@ -320,3 +311,5 @@ while map_queue.qsize() != 0:
             plt.scatter(X,Y)
             plt.show()
             break
+
+pygame_visualization(clearance = 5)
