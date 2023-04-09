@@ -71,7 +71,7 @@ Enter rpm2 : 100 </br>
 ## Part2 - ROS (Gazebo Visualization)
 For running part2 of phase2 i.e., Gazebo Visualization, run the following command
 ```
-roslaunch a_star a_star.launch x_pos:=0.3 y_pos:=0.3 clearance:=100 start_theta:=0 goal_x_pos:=5.1 goal_y_pos:=1.2 rpm1:=50 rpm2:=30
+roslaunch a_star a_star.launch x_pos:=0.0 y_pos:=0.0 clearance:=100 start_theta:=0 goal_x_pos:=5.0 goal_y_pos:=0.0 rpm1:=50 rpm2:=30
 ```
 
 ### Sample inputs for running part2
@@ -90,3 +90,6 @@ rpm1 and rpm2 are the number of rotations per minute
 https://drive.google.com/file/d/1VQNPc300kj1LL65xAfZy6Aw-AeKBYweF/view?usp=sharing
 ```
 ### Video link for Phase2 Part2 : Gazebo Visualization
+```
+https://drive.google.com/file/d/1Zp1ysvk2xDI5kVR2Wb2D7akeSyPckMve/view?usp=sharing
+```
