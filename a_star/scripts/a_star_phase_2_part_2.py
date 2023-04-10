@@ -8,16 +8,15 @@ from queue import PriorityQueue
 import time
 import pygame as pyg
 import rospy
-from std_msgs.msg import Int16MultiArray
 from geometry_msgs.msg import Twist
 
+# print("CODE STT")
 obstacle_points = []
 plot_intermediate_path = {}
 robot_velocity_tracking = {}
 # size of the map in centimeter for pygame visualization
 X_SIZE = 600
 Y_SIZE = 200
-
 
 # Radius of the Turtlebot3 wheel
 r = 0.033
@@ -27,10 +26,29 @@ L = 0.16
 # goal threshold distance from robot location
 goal_threshold = 0.05
 
+def ros_input():
+    rospy.init_node('a_star', anonymous=True)
+
+    clearance = rospy.get_param('~clearance', default=0.0)
+    clearance = clearance/1000
+    robot_radius = 0.105
+    obstacle_points = create_obstacle_map(clearance+robot_radius)
+    x_pos = rospy.get_param('~x_pos', default=0.0)
+    y_pos = rospy.get_param('~y_pos', default=0.0)
+    start_theta = rospy.get_param('~start_theta', default=0.0)
+    goal_x_pos = rospy.get_param('~goal_x_pos', default=0.0)
+    goal_y_pos = rospy.get_param('~goal_y_pos', default=0.0)
+    rpm1 = rospy.get_param('~rpm1', default=0.0)
+    rpm2 = rospy.get_param('~rpm2', default=0.0)
+    # print("---")
+    # print(x_pos, y_pos, start_theta)
+    # print("---")
+    return (x_pos+0.5, y_pos+1, start_theta), (goal_x_pos+0.5, goal_y_pos+1), obstacle_points, rpm1, rpm2, clearance
+    # return clearance, x_pos, y_pos, start_theta, goal_x_pos, goal_y_pos, rpm1, rpm2
+
 def talker(robot_velocity):
     #pub = rospy.Publisher('/turtle1/cmd_vel', Twist, queue_size=10)
     pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
-    rospy.init_node('robot_talker', anonymous=True)
     rate = rospy.Rate(1)
     i = 0
     #while not rospy.is_shutdown():
@@ -39,7 +57,6 @@ def talker(robot_velocity):
         msg.linear.x = robot_velocity[i][0]
         msg.angular.z = robot_velocity[i][1]
         pub.publish(msg)
-        print(msg.linear.x)
         i += 1
         time.sleep(1) 
     msg = Twist()
@@ -297,14 +314,14 @@ def pygame_visualization(clearance, visited_pts, shortest_path, parent_child_inf
         pyg.draw.circle(window, clearance_color, (400, 90), 50 + clearance)
         pyg.draw.circle(window, obstacle_color, (400, 90), 50)
 
-        for node in visited_pts:
-            #print(node)
-            if node != start_node:
-                parent = parent_child_info[node]
-                pts_list = plot_intermediate_path[(node,parent)]
-                pyg.draw.lines(window, "red", False,pts_list, width=3)
-                pyg.display.flip()
-                clock.tick(300)
+        # for node in visited_pts:
+        #     #print(node)
+        #     if node != start_node:
+        #         parent = parent_child_info[node]
+        #         pts_list = plot_intermediate_path[(node,parent)]
+        #         pyg.draw.lines(window, "red", False,pts_list, width=3)
+        #         pyg.display.flip()
+        #         clock.tick(300)
         
         for node in shortest_path:
             #print(node)
@@ -322,7 +339,8 @@ def pygame_visualization(clearance, visited_pts, shortest_path, parent_child_inf
     pyg.time.wait(3000)
     pyg.quit()
 
-start_node, goal_node, obstacle_points, rpm1, rpm2, clearance = get_input()
+start_node, goal_node, obstacle_points, rpm1, rpm2, clearance = ros_input()
+# start_node, goal_node, obstacle_points, rpm1, rpm2, clearance = get_input()
 action_set = [[0, rpm1], [rpm1, 0], [rpm1, rpm1], [0, rpm2], [rpm2, 0], [rpm2, rpm2], [rpm1, rpm2], [rpm2, rpm1]]
 
 start = time.time()

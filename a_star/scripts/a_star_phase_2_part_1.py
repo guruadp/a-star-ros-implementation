@@ -5,8 +5,6 @@ import matplotlib.pyplot as plt
 from queue import PriorityQueue
 import time
 import pygame as pyg
-from std_msgs.msg import Int16MultiArray
-from geometry_msgs.msg import Twist
 
 obstacle_points = []
 plot_intermediate_path = {}
